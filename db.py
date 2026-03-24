@@ -1,17 +1,15 @@
 """
 db.py — Databricks SQL connection + query runner
+Versão: Databricks Apps (autenticação nativa, sem .env)
 """
 import os
 import streamlit as st
 import pandas as pd
 from databricks import sql
-from dotenv import load_dotenv
 
-load_dotenv()
-
-DATABRICKS_HOST      = os.getenv("DATABRICKS_HOST", "")
-DATABRICKS_HTTP_PATH = os.getenv("DATABRICKS_HTTP_PATH", "")
-DATABRICKS_TOKEN     = os.getenv("DATABRICKS_TOKEN", "")
+DATABRICKS_HOST      = os.environ.get("DATABRICKS_HOST", "")
+DATABRICKS_HTTP_PATH = os.environ.get("DATABRICKS_HTTP_PATH", "")
+DATABRICKS_TOKEN     = os.environ.get("DATABRICKS_TOKEN", "")
 
 
 def _get_connection():
@@ -24,7 +22,6 @@ def _get_connection():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def run_query(query: str) -> pd.DataFrame:
-    """Executa uma query no Databricks e retorna DataFrame. Cache de 5 min."""
     with _get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(query)
@@ -33,55 +30,24 @@ def run_query(query: str) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
-# ──────────────────────────────────────────────
-# Queries principais
-# ──────────────────────────────────────────────
-
 QUERY_BASE_CONSULTA = """
 SELECT
-  data,
-  turno,
-  rota_principal,
-  sentido,
-  antecedencia,
-  dia_da_semana,
-  pax,
-  capacidade_atual,
-  occ_atual,
-  vagas_restantes,
-  lf_proj_2026,
-  lf_atual,
-  ratio_vs_proj,
-  tkm_atual,
-  tkm_comp,
-  preco_base,
-  preco_est_draft,
-  preco_est_novo,
-  preco_praticado,
-  mult_final,
-  mult_flutuacao,
-  price_cc
+  data, turno, rota_principal, sentido, antecedencia, dia_da_semana,
+  pax, capacidade_atual, occ_atual, vagas_restantes,
+  lf_proj_2026, lf_atual, ratio_vs_proj,
+  tkm_atual, tkm_comp,
+  preco_base, preco_est_draft, preco_est_novo, preco_praticado,
+  mult_final, mult_flutuacao, price_cc
 FROM base_consulta
 WHERE data BETWEEN date('{data_ini}') AND date('{data_fim}')
 """
 
 QUERY_ALERTAS = """
 SELECT
-  data,
-  turno,
-  rota_principal,
-  sentido,
-  antecedencia,
-  occ_atual,
-  lf_atual,
-  lf_proj_2026,
-  ratio_vs_proj,
-  mult_final,
-  mult_flutuacao,
-  preco_praticado,
-  price_cc,
-  vagas_restantes,
-  capacidade_atual
+  data, turno, rota_principal, sentido, antecedencia,
+  occ_atual, lf_atual, lf_proj_2026, ratio_vs_proj,
+  mult_final, mult_flutuacao, preco_praticado, price_cc,
+  vagas_restantes, capacidade_atual
 FROM base_consulta
 WHERE ratio_vs_proj > {ratio_min}
   AND mult_final < {mult_max}
