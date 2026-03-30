@@ -315,18 +315,19 @@ tbody td{{
 tbody tr:hover td{{background:#0e1828}}
 
 /* ── Badges ── */
-.badge{{
-  display:inline-block;
-  font-family:'DM Mono',monospace;
-  font-size:10px;
-  font-weight:500;
-  padding:2px 8px;
-  border-radius:4px;
-}}
-.badge.crit {{background:#2a0a0a;color:#e05050;border:1px solid #3d1010}}
-.badge.warn {{background:#231500;color:#d4860a;border:1px solid #3d2500}}
-.badge.ok   {{background:#0a1f12;color:#00c896;border:1px solid #0d3020}}
-.badge.gray {{background:#111822;color:#3a5070;border:1px solid #1a2a44}}
+.rank-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}}
+.rank-card{{background:#0c1220;border:1px solid #131d2e;border-radius:10px;overflow:hidden}}
+.rank-header{{display:flex;align-items:center;justify-content:space-between;padding:11px 14px 10px;border-bottom:1px solid #131d2e}}
+.rank-label{{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#2a3d5c}}
+.rank-label.top{{color:#00c896}}.rank-label.bot{{color:#e05050}}
+.rank-row{{display:flex;align-items:center;gap:0;padding:7px 14px;border-bottom:1px solid #0e1624;transition:background .1s}}
+.rank-row:last-child{{border-bottom:none}}.rank-row:hover{{background:#0e1828}}
+.rank-num{{font-family:'DM Mono',monospace;font-size:10px;color:#1e3a5f;width:18px;flex-shrink:0}}
+.rank-eixo{{flex:1;font-size:12px;color:#8a9bb5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.rank-turno{{font-family:'DM Mono',monospace;font-size:10px;color:#2a3d5c;width:76px;text-align:right;flex-shrink:0}}
+.rank-bar-wrap{{width:80px;height:4px;background:#0e1624;border-radius:2px;margin:0 10px;flex-shrink:0}}
+.rank-bar{{height:4px;border-radius:2px}}
+.rank-val{{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;width:46px;text-align:right;flex-shrink:0}}
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar{{width:5px;height:5px}}
@@ -342,6 +343,7 @@ tbody tr:hover td{{background:#0e1828}}
 </div>
 
 <div class="kpi-row" id="kpi-row"></div>
+<div class="rank-grid" id="rank-grid"></div>
 
 <div class="filter-row">
   <div class="filter-group">
@@ -357,15 +359,6 @@ tbody tr:hover td{{background:#0e1828}}
     <select id="f-turno"  onchange="render()">
       <option value="">Todos</option>
       <option>MANHA</option><option>TARDE</option><option>NOITE</option><option>MADRUGADA</option>
-    </select>
-  </div>
-  <div class="filter-group">
-    <span class="filter-label">Status</span>
-    <select id="f-status" onchange="render()">
-      <option value="">Todos</option>
-      <option value="crit">Crítico</option>
-      <option value="warn">Atenção</option>
-      <option value="ok">Saudável</option>
     </select>
   </div>
   <div class="filter-group">
@@ -447,7 +440,7 @@ tbody tr:hover td{{background:#0e1828}}
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Status</th><th>Rota</th><th>Sentido</th><th>Turno</th><th>Data</th><th>Ant.</th>
+          <th>Rota</th><th>Sentido</th><th>Turno</th><th>Data</th><th>Ant.</th>
           <th>LF Proj</th><th>LF Atual</th><th>Ratio</th>
           <th>PAX</th><th>Cap.</th><th>Occ%</th>
           <th>Preço Base</th><th>Praticado</th><th>Mult.</th><th>CC</th>
@@ -473,23 +466,11 @@ const avg  = arr => arr.filter(v=>v!=null&&!isNaN(v)).length
                     ? arr.filter(v=>v!=null&&!isNaN(v)).reduce((a,b)=>a+b,0) / arr.filter(v=>v!=null&&!isNaN(v)).length
                     : null;
 
-function classifica(ratio) {{
-  if (ratio == null) return 'gray';
-  if (ratio < 0.30)  return 'crit';
-  if (ratio < 0.60)  return 'warn';
-  return 'ok';
-}}
-
 function ratioColor(r) {{
   if (r == null) return '#1e3a5f';
   if (r < 0.30)  return '#e05050';
   if (r < 0.60)  return '#d4860a';
   return '#00c896';
-}}
-
-function badge(cls) {{
-  const lbl = {{crit:'Crítico',warn:'Atenção',ok:'Saudável',gray:'Sem proj.'}};
-  return `<span class="badge ${{cls}}">${{lbl[cls]||''}}</span>`;
 }}
 
 // ── Popula selects ───────────────────────────────────────────
@@ -508,17 +489,12 @@ const sel = id => document.getElementById(id);
 // ── Filtro ───────────────────────────────────────────────────
 function filtered() {{
   const fD=sel('f-data').value, fR=sel('f-rota').value,
-        fT=sel('f-turno').value, fS=sel('f-status').value,
-        fA=sel('f-ant').value;
+        fT=sel('f-turno').value, fA=sel('f-ant').value;
   return ALL.filter(d=>{{
     if(fD && d.data!==fD) return false;
     if(fR && d.rota_principal!==fR) return false;
     if(fT && d.turno!==fT) return false;
     if(fA && String(d.antecedencia)!==fA) return false;
-    if(fS){{
-      const r = d.lf_proj_2026>0 ? d.lf_atual/d.lf_proj_2026 : null;
-      if(classifica(r)!==fS) return false;
-    }}
     return true;
   }});
 }}
@@ -579,32 +555,70 @@ function render() {{
   const ants=byAnt(data);
 
   // KPIs
-  const criticos = grp.filter(r=>r.ratio!=null&&r.ratio<0.30).length;
-  const atencao  = grp.filter(r=>r.ratio!=null&&r.ratio>=0.30&&r.ratio<0.60).length;
-  const saudavel = grp.filter(r=>r.ratio!=null&&r.ratio>=0.60).length;
-  const ratioMed = avg(grp.map(r=>r.ratio).filter(v=>v!=null));
-  const kpiCls   = ratioMed==null?'neu':ratioMed>=0.60?'up':ratioMed>=0.30?'warn':'down';
+  const ratioMed = avg(grp.filter(r=>r.ratio!=null).map(r=>r.ratio));
+  const ratioMax = grp.filter(r=>r.ratio!=null).reduce((m,r)=>r.ratio>m?r.ratio:m, 0);
+  const ratioMin = grp.filter(r=>r.ratio!=null).reduce((m,r)=>r.ratio<m?r.ratio:m, Infinity);
+  const kpiCls   = ratioMed==null?'neu':ratioMed>=1.0?'up':ratioMed>=0.70?'warn':'down';
 
   sel('kpi-row').innerHTML=`
     <div class="kpi ${{kpiCls}}">
-      <div class="kpi-label">Ratio médio (lf_atual/proj)</div>
-      <div class="kpi-value">${{ratioMed!=null?(ratioMed*100).toFixed(0)+'%':'–'}}</div>
-      <div class="kpi-sub">${{grp.length}} eixos filtrados</div>
-    </div>
-    <div class="kpi ${{criticos>0?'down':'neu'}}">
-      <div class="kpi-label">Críticos (&lt; 30% do proj)</div>
-      <div class="kpi-value">${{criticos}}</div>
-      <div class="kpi-sub">eixos abaixo do threshold</div>
-    </div>
-    <div class="kpi ${{atencao>0?'warn':'neu'}}">
-      <div class="kpi-label">Atenção (30 – 60%)</div>
-      <div class="kpi-value">${{atencao}}</div>
-      <div class="kpi-sub">eixos em zona amarela</div>
+      <div class="kpi-label">Ratio médio (lf_atual / proj)</div>
+      <div class="kpi-value">${{ratioMed!=null?(ratioMed*100).toFixed(1)+'%':'–'}}</div>
+      <div class="kpi-sub">${{grp.filter(r=>r.ratio!=null).length}} eixos com projeção</div>
     </div>
     <div class="kpi up">
-      <div class="kpi-label">Saudáveis (≥ 60%)</div>
-      <div class="kpi-value">${{saudavel}}</div>
-      <div class="kpi-sub">eixos no target</div>
+      <div class="kpi-label">Maior ratio</div>
+      <div class="kpi-value">${{ratioMax!=0?(ratioMax*100).toFixed(1)+'%':'–'}}</div>
+      <div class="kpi-sub">melhor vs projetado</div>
+    </div>
+    <div class="kpi down">
+      <div class="kpi-label">Menor ratio</div>
+      <div class="kpi-value">${{ratioMin!=Infinity?(ratioMin*100).toFixed(1)+'%':'–'}}</div>
+      <div class="kpi-sub">pior vs projetado</div>
+    </div>
+    <div class="kpi neu">
+      <div class="kpi-label">Total eixos</div>
+      <div class="kpi-value">${{grp.length}}</div>
+      <div class="kpi-sub">${{data.length}} linhas filtradas</div>
+    </div>
+  `;
+
+  // ── Ranking top/bottom ──
+  const withRatio = grp.filter(r=>r.ratio!=null);
+  const TOP = [...withRatio].sort((a,b)=>b.ratio-a.ratio).slice(0,8);
+  const BOT = [...withRatio].sort((a,b)=>a.ratio-b.ratio).slice(0,8);
+  const maxR = TOP.length ? TOP[0].ratio : 1;
+
+  function rankRows(list, isTop) {{
+    return list.map((r,i)=>{{
+      const pct=(r.ratio*100).toFixed(1)+'%';
+      const barW=Math.round((r.ratio/Math.max(maxR,0.01))*100);
+      const barColor=isTop?'#00c896':'#e05050';
+      const dataLabel=r.eixo+(r.turno?'  ·  '+r.turno.toLowerCase():'');
+      return `<div class="rank-row">
+        <span class="rank-num">${{i+1}}</span>
+        <span class="rank-eixo" title="${{r.eixo}}">${{r.eixo}}</span>
+        <span class="rank-turno">${{r.turno||''}}</span>
+        <span class="rank-bar-wrap"><span class="rank-bar" style="width:${{barW}}%;background:${{barColor}}"></span></span>
+        <span class="rank-val" style="color:${{barColor}}">${{pct}}</span>
+      </div>`;
+    }}).join('');
+  }}
+
+  sel('rank-grid').innerHTML=`
+    <div class="rank-card">
+      <div class="rank-header">
+        <span class="rank-label top">↑ maiores ratios</span>
+        <span style="font-family:'DM Mono',monospace;font-size:9px;color:#1e3a5f">lf_atual / lf_proj</span>
+      </div>
+      ${{rankRows(TOP, true)}}
+    </div>
+    <div class="rank-card">
+      <div class="rank-header">
+        <span class="rank-label bot">↓ menores ratios</span>
+        <span style="font-family:'DM Mono',monospace;font-size:9px;color:#1e3a5f">lf_atual / lf_proj</span>
+      </div>
+      ${{rankRows(BOT, false)}}
     </div>
   `;
 
@@ -825,13 +839,11 @@ function render() {{
   // ── Tabela ──
   sel('tbody').innerHTML = data.map(d=>{{
     const ratio=d.lf_proj_2026>0 ? d.lf_atual/d.lf_proj_2026 : null;
-    const cls  =classifica(ratio);
     const pct  =v=>v!=null?(v*100).toFixed(1)+'%':'–';
     const brl  =v=>v!=null?'R$ '+(+v).toFixed(0):'–';
     const num  =v=>v!=null?v:'–';
     const ratioStyle=`color:${{ratioColor(ratio)}};font-weight:600;font-family:'DM Mono',monospace`;
     return `<tr>
-      <td>${{badge(cls)}}</td>
       <td style="color:#c8d8f0;font-weight:500">${{d.rota_principal}}</td>
       <td>${{d.sentido||'–'}}</td>
       <td>${{d.turno||'–'}}</td>
