@@ -1,0 +1,12 @@
+{
+  "feriados": [
+    {
+      "key": "tiradentes_2026",
+      "nome": "Tiradentes 2026",
+      "dt_ini": "2026-04-17",
+      "dt_fim": "2026-04-21",
+      "arquivo": "data/feriado_tiradentes_2026.csv",
+      "atualizado": "30/03/2026 18:24"
+    }
+  ]
+}
