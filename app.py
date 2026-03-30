@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 
 # ── CONFIGURAÇÃO ──────────────────────────────────────────────────────────────
-GITHUB_RAW  = "https://raw.githubusercontent.com/seu-org/seu-repo/main"
+GITHUB_RAW  = "https://raw.githubusercontent.com/meninosia2026-beep/pricing-farol-tiradentes/main"
 CONFIG_URL  = f"{GITHUB_RAW}/data/config.json"
 
 st.set_page_config(
@@ -104,10 +104,16 @@ hr { border-color: #1e2230; }
 def load_config():
     try:
         r = requests.get(CONFIG_URL, timeout=10)
-        return r.json()
+        if r.status_code != 200:
+            return {"feriados": [], "_erro": f"HTTP {r.status_code} ao buscar config.json"}
+        text = r.text.strip()
+        if not text:
+            return {"feriados": [], "_erro": "config.json está vazio no GitHub"}
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        return {"feriados": [], "_erro": f"config.json inválido: {e}"}
     except Exception as e:
-        st.error(f"Erro ao carregar config: {e}")
-        return {"feriados": []}
+        return {"feriados": [], "_erro": f"Erro de conexão: {e}"}
 
 @st.cache_data(ttl=120)
 def load_csv(url: str) -> pd.DataFrame:
@@ -146,27 +152,49 @@ def fmt_brl(val):
 
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
-config = load_config()
+config   = load_config()
 feriados = config.get("feriados", [])
-
-if not feriados:
-    st.warning("Nenhum feriado publicado ainda. Rode o notebook no Databricks.")
-    st.stop()
+_cfg_err = config.get("_erro")
 
 with st.sidebar:
     st.markdown("### 📅 Feriado")
-    feriado_options = {f["nome"]: f for f in feriados}
-    feriado_nome    = st.selectbox("Selecione", list(feriado_options.keys()), label_visibility="collapsed")
-    feriado_cfg     = feriado_options[feriado_nome]
 
-    if "atualizado" in feriado_cfg:
-        st.markdown(f'<div class="updated-tag">atualizado {feriado_cfg["atualizado"]}</div>', unsafe_allow_html=True)
+    # ── Mostra aviso se config.json falhou, mas não trava o app ──
+    if _cfg_err:
+        st.warning(f"⚠️ config.json: {_cfg_err}")
+
+    # ── Modo manual: cola a URL do CSV direto ─────────────────────
+    usar_manual = st.toggle("Carregar CSV por URL manual", value=(not feriados))
+
+    if usar_manual or not feriados:
+        csv_url_manual = st.text_input(
+            "URL do CSV (raw GitHub)",
+            placeholder=f"{GITHUB_RAW}/data/feriado_tiradentes_2026.csv",
+        )
+        feriado_cfg = {
+            "nome":    st.text_input("Nome do feriado", value="Feriado"),
+            "key":     "manual",
+            "dt_ini":  st.text_input("Data início (AAAA-MM-DD)", value=""),
+            "dt_fim":  st.text_input("Data fim   (AAAA-MM-DD)", value=""),
+            "arquivo": "",
+        }
+        csv_url = csv_url_manual.strip()
+        if not csv_url:
+            st.info("Cole a URL do CSV acima para começar.")
+            st.stop()
+        feriado_nome = feriado_cfg["nome"]
+    else:
+        feriado_options = {f["nome"]: f for f in feriados}
+        feriado_nome    = st.selectbox("Selecione", list(feriado_options.keys()), label_visibility="collapsed")
+        feriado_cfg     = feriado_options[feriado_nome]
+        if "atualizado" in feriado_cfg:
+            st.markdown(f'<div class="updated-tag">atualizado {feriado_cfg["atualizado"]}</div>', unsafe_allow_html=True)
+        csv_url = f"{GITHUB_RAW}/{feriado_cfg['arquivo']}"
 
     st.divider()
 
     # Carrega dados do feriado selecionado
-    csv_url = f"{GITHUB_RAW}/{feriado_cfg['arquivo']}"
-    df_raw  = load_csv(csv_url)
+    df_raw = load_csv(csv_url)
 
     if df_raw.empty:
         st.error("Sem dados para este feriado.")
