@@ -1,12 +1,12 @@
 """
-Farol de Feriados — Dashboard de acompanhamento de demanda e preço
+Farol de Feriados — app.py
+Puxa CSV do GitHub (gerado pelo Databricks) e renderiza um dashboard HTML inline.
 """
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import requests, json
-from datetime import datetime
+import requests
+import json
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────────
 GITHUB_RAW = "https://raw.githubusercontent.com/meninosia2026-beep/pricing-farol-tiradentes/main"
@@ -19,165 +19,28 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── DESIGN ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
-
-*, html, body { box-sizing: border-box; }
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    background: #080b12;
-    color: #cdd5e0;
-}
-
-section[data-testid="stSidebar"] {
-    background: #0c1018 !important;
-    border-right: 1px solid #151c28;
-    padding-top: 8px;
-}
-section[data-testid="stSidebar"] * { font-size: 13px; }
-section[data-testid="stSidebar"] .stSelectbox label,
-section[data-testid="stSidebar"] .stMultiSelect label,
-section[data-testid="stSidebar"] .stSlider label,
-section[data-testid="stSidebar"] .stTextInput label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #3d4f6b !important;
-}
-
-.page-header {
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-    padding: 4px 0 20px 0;
-    border-bottom: 1px solid #151c28;
-    margin-bottom: 24px;
-}
-.page-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 22px;
-    font-weight: 500;
-    color: #e8eef6;
-    letter-spacing: -0.03em;
-    margin: 0;
-}
-.page-subtitle {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: #2e4060;
-    letter-spacing: 0.04em;
-}
-
-.kpi-row { display: flex; gap: 12px; margin-bottom: 28px; }
-.kpi {
-    flex: 1;
-    background: #0c1018;
-    border: 1px solid #151c28;
-    border-radius: 10px;
-    padding: 18px 20px 14px;
-    position: relative;
-    overflow: hidden;
-}
-.kpi::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: #1e3a5f;
-}
-.kpi.up::before   { background: linear-gradient(90deg,#00d9a3,#0066ff); }
-.kpi.down::before { background: linear-gradient(90deg,#ff4560,#ff8c42); }
-.kpi.warn::before { background: linear-gradient(90deg,#f5a623,#ffd700); }
-.kpi.neu::before  { background: linear-gradient(90deg,#2e4060,#3d5a80); }
-.kpi-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 9px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: #2e4060;
-    margin-bottom: 8px;
-}
-.kpi-value {
-    font-family: 'DM Mono', monospace;
-    font-size: 30px;
-    font-weight: 500;
-    line-height: 1;
-    color: #e8eef6;
-    margin-bottom: 4px;
-}
-.kpi.up   .kpi-value { color: #00d9a3; }
-.kpi.down .kpi-value { color: #ff4560; }
-.kpi.warn .kpi-value { color: #f5a623; }
-.kpi-sub { font-size: 11px; color: #2e4060; }
-
-.section-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #2e4060;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #151c28;
-}
-
-.stTabs [data-baseweb="tab-list"] {
-    background: transparent;
-    gap: 4px;
-    border-bottom: 1px solid #151c28;
-}
-.stTabs [data-baseweb="tab"] {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    color: #2e4060;
-    background: transparent;
-    border-radius: 6px 6px 0 0;
-    padding: 8px 16px;
-    border: none;
-}
-.stTabs [aria-selected="true"] {
-    color: #e8eef6 !important;
-    background: #0c1018 !important;
-    border-bottom: 2px solid #0066ff !important;
-}
-
-.chart-wrap {
-    background: #0c1018;
-    border: 1px solid #151c28;
-    border-radius: 10px;
-    padding: 8px;
-    margin-bottom: 16px;
-}
-
-hr { border-color: #151c28 !important; }
-
-.stDownloadButton button {
-    background: #0c1018;
-    border: 1px solid #1e3a5f;
-    color: #4a90d9;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    border-radius: 6px;
-}
+section[data-testid="stSidebar"] { background:#0c1018; border-right:1px solid #1a2236; }
+section[data-testid="stSidebar"] * { color:#8a9bb5 !important; font-size:13px; }
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] strong { color:#c8d4e6 !important; font-size:14px; }
+.stApp { background:#080c14; }
+.block-container { padding-top:1rem !important; }
+hr { border-color:#1a2236 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── FUNÇÕES ─────────────────────────────────────────────────────────────────────
+# ── HELPERS ────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=120)
 def load_config():
     try:
         r = requests.get(CONFIG_URL, timeout=10)
         if r.status_code != 200:
             return {"feriados": [], "_erro": f"HTTP {r.status_code}"}
-        text = r.text.strip()
-        if not text:
-            return {"feriados": [], "_erro": "config.json vazio"}
-        return json.loads(text)
+        t = r.text.strip()
+        return json.loads(t) if t else {"feriados": [], "_erro": "config.json vazio"}
     except json.JSONDecodeError as e:
         return {"feriados": [], "_erro": f"JSON inválido: {e}"}
     except Exception as e:
@@ -187,68 +50,31 @@ def load_config():
 def load_csv(url: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(url)
-        num_cols = [
-            "antecedencia","dia_da_semana","occ_atual","lf_atual","lf_proj_2026",
-            "ratio_vs_proj","rpk_proj_2026","ask_proj_2026","rpk","ask",
-            "price_cc","preco_praticado","preco_base","mult_final","mult_flutuacao",
-            "pax","vagas_restantes","capacidade_atual",
-        ]
-        for c in num_cols:
+        num = ["antecedencia","dia_da_semana","occ_atual","lf_atual","lf_proj_2026",
+               "ratio_vs_proj","price_cc","preco_praticado","preco_base",
+               "preco_est_draft","preco_est_novo","mult_final","mult_flutuacao",
+               "pax","vagas_restantes","capacidade_atual","tkm_atual","tkm_comp"]
+        for c in num:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
         if "data" in df.columns:
             df["data"] = pd.to_datetime(df["data"], errors="coerce")
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar CSV: {e}")
+        st.error(f"Erro: {e}")
         return pd.DataFrame()
 
-def fmt_pct(v):  return f"{v:.1%}"       if pd.notna(v) else "–"
-def fmt_brl(v):  return f"R$ {v:,.0f}"   if pd.notna(v) else "–"
-def fmt_x(v):    return f"{v:.2f}×"      if pd.notna(v) else "–"
-def kpi_cls(v, hi=1.05, lo=0.95):
-    if pd.isna(v): return "neu"
-    return "up" if v >= hi else ("down" if v < lo else "warn")
 
-# ── PALETA / PLOT ────────────────────────────────────────────────────────────────
-CARD_BG = "#0c1018"
-GRID    = "#151c28"
-BLUE    = "#0066ff"
-TEAL    = "#00d9a3"
-RED     = "#ff4560"
-AMBER   = "#f5a623"
-GRAY    = "#2e4060"
-MONO    = "DM Mono"
-PFONT   = dict(family=MONO, color="#4a6080", size=11)
-
-def base_fig(h=380):
-    return dict(
-        paper_bgcolor=CARD_BG, plot_bgcolor=CARD_BG,
-        font=PFONT, height=h,
-        margin=dict(l=52, r=24, t=36, b=44),
-        xaxis=dict(gridcolor=GRID, zerolinecolor=GRID, tickfont=PFONT, linecolor=GRID),
-        yaxis=dict(gridcolor=GRID, zerolinecolor=GRID, tickfont=PFONT, linecolor=GRID),
-        legend=dict(
-            bgcolor=CARD_BG, bordercolor=GRID, borderwidth=1,
-            font=dict(family=MONO, size=11, color="#6b8cae"),
-            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-        ),
-        hovermode="x unified",
-        hoverlabel=dict(bgcolor="#0c1828", font=dict(family=MONO, size=12)),
-    )
-
-
-# ── SIDEBAR ─────────────────────────────────────────────────────────────────────
+# ── SIDEBAR ────────────────────────────────────────────────────────────────────
 config   = load_config()
 feriados = config.get("feriados", [])
 _err     = config.get("_erro")
 
 with st.sidebar:
-    st.markdown("**FAROL · FERIADOS**")
+    st.markdown("**🔦 FAROL · FERIADOS**")
     st.divider()
-
     if _err:
-        st.caption(f"⚠ {_err}")
+        st.caption(f"⚠ config.json: {_err}")
 
     usar_manual = st.toggle("URL manual", value=(not feriados))
 
@@ -257,12 +83,7 @@ with st.sidebar:
             "URL raw do CSV",
             placeholder=f"{GITHUB_RAW}/data/feriado_tiradentes_2026.csv",
         ).strip()
-        feriado_cfg  = {
-            "nome":  st.text_input("Nome", "Feriado"),
-            "key":   "manual",
-            "dt_ini": "",
-            "dt_fim": "",
-        }
+        feriado_cfg  = {"nome": st.text_input("Nome", "Feriado"), "key": "manual", "dt_ini": "", "dt_fim": ""}
         feriado_nome = feriado_cfg["nome"]
         if not csv_url:
             st.info("Cole a URL do CSV para carregar.")
@@ -272,7 +93,7 @@ with st.sidebar:
         feriado_nome = st.selectbox("Feriado", list(opts.keys()))
         feriado_cfg  = opts[feriado_nome]
         if "atualizado" in feriado_cfg:
-            st.caption(f"atualizado {feriado_cfg['atualizado']}")
+            st.caption(f"↺ atualizado {feriado_cfg['atualizado']}")
         csv_url = f"{GITHUB_RAW}/{feriado_cfg['arquivo']}"
 
     st.divider()
@@ -281,350 +102,767 @@ with st.sidebar:
         st.error("Sem dados.")
         st.stop()
 
-    st.markdown("**FILTROS**")
-
-    datas_disp  = sorted(df_raw["data"].dt.date.unique())       if "data"           in df_raw.columns else []
-    datas_sel   = st.multiselect("Data",  datas_disp,  default=datas_disp,  format_func=lambda d: d.strftime("%d/%m"))
-    turnos_disp = sorted(df_raw["turno"].dropna().unique())     if "turno"          in df_raw.columns else []
-    turnos_sel  = st.multiselect("Turno", turnos_disp, default=turnos_disp)
-    rotas_disp  = sorted(df_raw["rota_principal"].dropna().unique()) if "rota_principal" in df_raw.columns else []
-    rotas_sel   = st.multiselect("Rota",  rotas_disp,  default=rotas_disp[:12] if len(rotas_disp) > 12 else rotas_disp)
-    ant_min = int(df_raw["antecedencia"].min()) if "antecedencia" in df_raw.columns else 0
-    ant_max = int(df_raw["antecedencia"].max()) if "antecedencia" in df_raw.columns else 80
-    ant_sel = st.slider("Antecedência (dias)", ant_min, ant_max, (ant_min, ant_max))
-
-    st.divider()
-    if st.button("↺  Recarregar"):
+    if st.button("↺  Recarregar dados"):
         st.cache_data.clear()
         st.rerun()
 
 
-# ── FILTROS ──────────────────────────────────────────────────────────────────────
+# ── PREPARA JSON PARA O HTML ───────────────────────────────────────────────────
 df = df_raw.copy()
-if datas_sel  and "data"           in df.columns: df = df[df["data"].dt.date.isin(datas_sel)]
-if turnos_sel and "turno"          in df.columns: df = df[df["turno"].isin(turnos_sel)]
-if rotas_sel  and "rota_principal" in df.columns: df = df[df["rota_principal"].isin(rotas_sel)]
-if "antecedencia" in df.columns:                  df = df[df["antecedencia"].between(*ant_sel)]
+if "data" in df.columns:
+    df["data"] = df["data"].dt.strftime("%Y-%m-%d")
+
+rows = df.to_dict(orient="records")
+# garante que NaN vira null no JSON
+data_json = json.dumps(rows, default=lambda v: None if (isinstance(v, float) and v != v) else v)
+
+periodo_str = f"{feriado_cfg.get('dt_ini', '')} → {feriado_cfg.get('dt_fim', '')}"
 
 
-# ── HEADER ────────────────────────────────────────────────────────────────────────
-periodo_str = f"{feriado_cfg.get('dt_ini','')}  →  {feriado_cfg.get('dt_fim','')}"
-st.markdown(f"""
-<div class="page-header">
-  <span class="page-title">🔦 {feriado_nome}</span>
-  <span class="page-subtitle">{periodo_str}</span>
+# ── HTML DASHBOARD ─────────────────────────────────────────────────────────────
+html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{
+  background:#080c14;
+  color:#8a9bb5;
+  font-family:'DM Sans',sans-serif;
+  padding:20px 24px;
+  min-height:100vh;
+}}
+
+/* ── Header ── */
+.header{{
+  display:flex;
+  align-items:baseline;
+  gap:12px;
+  padding-bottom:18px;
+  border-bottom:1px solid #131d2e;
+  margin-bottom:22px;
+}}
+.header-title{{
+  font-family:'DM Mono',monospace;
+  font-size:20px;
+  font-weight:500;
+  color:#dce6f5;
+  letter-spacing:-0.02em;
+}}
+.header-period{{
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:#2a3d5c;
+  letter-spacing:0.05em;
+}}
+
+/* ── KPI row ── */
+.kpi-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}}
+.kpi{{
+  background:#0c1220;
+  border:1px solid #131d2e;
+  border-radius:10px;
+  padding:16px 18px 13px;
+  position:relative;
+  overflow:hidden;
+}}
+.kpi::after{{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background:var(--ac,#1e3a5f);
+}}
+.kpi.up::after   {{background:linear-gradient(90deg,#00c896,#0055e0)}}
+.kpi.down::after {{background:linear-gradient(90deg,#e03030,#f07030)}}
+.kpi.warn::after {{background:linear-gradient(90deg,#d4860a,#e8c030)}}
+.kpi.neu::after  {{background:linear-gradient(90deg,#1e3a5f,#2a4f7a)}}
+.kpi-label{{
+  font-family:'DM Mono',monospace;
+  font-size:9px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:#1e3a5f;
+  margin-bottom:7px;
+}}
+.kpi-value{{
+  font-family:'DM Mono',monospace;
+  font-size:28px;
+  font-weight:500;
+  line-height:1;
+  color:#c8d8f0;
+  margin-bottom:3px;
+}}
+.kpi.up   .kpi-value{{color:#00c896}}
+.kpi.down .kpi-value{{color:#e05050}}
+.kpi.warn .kpi-value{{color:#d4860a}}
+.kpi-sub{{font-size:11px;color:#1e3a5f}}
+
+/* ── Filters ── */
+.filter-row{{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-bottom:18px;
+  padding:12px 14px;
+  background:#0c1220;
+  border:1px solid #131d2e;
+  border-radius:10px;
+}}
+.filter-group{{display:flex;flex-direction:column;gap:3px}}
+.filter-label{{
+  font-family:'DM Mono',monospace;
+  font-size:9px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:#1e3a5f;
+}}
+.filter-row select{{
+  background:#080c14;
+  border:1px solid #1a2a44;
+  color:#8a9bb5;
+  border-radius:6px;
+  padding:5px 10px;
+  font-size:12px;
+  font-family:'DM Sans',sans-serif;
+  outline:none;
+  cursor:pointer;
+  min-width:130px;
+}}
+.filter-row select:focus{{border-color:#0055e0}}
+
+/* ── Tabs ── */
+.tabs{{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #131d2e;padding-bottom:0}}
+.tab{{
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.04em;
+  color:#2a3d5c;
+  background:transparent;
+  border:none;
+  border-bottom:2px solid transparent;
+  padding:8px 16px 10px;
+  cursor:pointer;
+  transition:color .15s,border-color .15s;
+}}
+.tab:hover{{color:#7a9abf}}
+.tab.active{{color:#dce6f5;border-bottom-color:#0055e0}}
+
+/* ── Panel / Card ── */
+.panel{{display:none}}
+.panel.active{{display:block}}
+.card{{
+  background:#0c1220;
+  border:1px solid #131d2e;
+  border-radius:10px;
+  padding:16px 18px;
+  margin-bottom:14px;
+}}
+.card-title{{
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:#2a3d5c;
+  margin-bottom:12px;
+  padding-bottom:8px;
+  border-bottom:1px solid #131d2e;
+}}
+.legend{{
+  display:flex;gap:16px;flex-wrap:wrap;
+  font-size:11px;color:#3a5070;
+  margin-bottom:10px;
+  font-family:'DM Mono',monospace;
+}}
+.leg{{display:flex;align-items:center;gap:5px}}
+.leg-sq{{width:9px;height:9px;border-radius:2px;flex-shrink:0}}
+
+/* ── Canvas wrapper ── */
+.chart-box{{position:relative;width:100%}}
+
+/* ── Table ── */
+.tbl-wrap{{overflow-x:auto}}
+table{{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+  font-family:'DM Sans',sans-serif;
+}}
+thead th{{
+  background:#080c14;
+  color:#2a3d5c;
+  font-family:'DM Mono',monospace;
+  font-size:9px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  padding:9px 11px;
+  text-align:left;
+  border-bottom:1px solid #131d2e;
+  white-space:nowrap;
+  position:sticky;top:0;
+}}
+tbody td{{
+  padding:8px 11px;
+  border-bottom:1px solid #0e1624;
+  color:#7a8faa;
+  white-space:nowrap;
+}}
+tbody tr:hover td{{background:#0e1828}}
+
+/* ── Badges ── */
+.badge{{
+  display:inline-block;
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  font-weight:500;
+  padding:2px 8px;
+  border-radius:4px;
+}}
+.badge.crit {{background:#2a0a0a;color:#e05050;border:1px solid #3d1010}}
+.badge.warn {{background:#231500;color:#d4860a;border:1px solid #3d2500}}
+.badge.ok   {{background:#0a1f12;color:#00c896;border:1px solid #0d3020}}
+.badge.gray {{background:#111822;color:#3a5070;border:1px solid #1a2a44}}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{{width:5px;height:5px}}
+::-webkit-scrollbar-track{{background:#080c14}}
+::-webkit-scrollbar-thumb{{background:#1a2a44;border-radius:3px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-title">🔦 {feriado_nome}</span>
+  <span class="header-period">{periodo_str}</span>
 </div>
-""", unsafe_allow_html=True)
 
+<div class="kpi-row" id="kpi-row"></div>
 
-# ── KPIs ─────────────────────────────────────────────────────────────────────────
-ratio_med = df["ratio_vs_proj"].mean()    if "ratio_vs_proj"   in df.columns else None
-occ_med   = df["occ_atual"].mean()        if "occ_atual"        in df.columns else None
-preco_med = df["preco_praticado"].mean()  if "preco_praticado"  in df.columns else None
-cc_med    = df["price_cc"].mean()         if "price_cc"         in df.columns else None
-n_rotas   = df["rota_principal"].nunique() if "rota_principal"  in df.columns else 0
-delta_p   = ((preco_med / cc_med) - 1)   if preco_med and cc_med else None
+<div class="filter-row">
+  <div class="filter-group">
+    <span class="filter-label">Data</span>
+    <select id="f-data"   onchange="render()"><option value="">Todas</option></select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Rota</span>
+    <select id="f-rota"   onchange="render()"><option value="">Todas</option></select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Turno</span>
+    <select id="f-turno"  onchange="render()">
+      <option value="">Todos</option>
+      <option>MANHA</option><option>TARDE</option><option>NOITE</option><option>MADRUGADA</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Status</span>
+    <select id="f-status" onchange="render()">
+      <option value="">Todos</option>
+      <option value="crit">Crítico</option>
+      <option value="warn">Atenção</option>
+      <option value="ok">Saudável</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Antecedência</span>
+    <select id="f-ant" onchange="render()"><option value="">Todas</option></select>
+  </div>
+</div>
 
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    st.markdown(f"""<div class="kpi {kpi_cls(ratio_med)}">
-      <div class="kpi-label">LF atual / projetado</div>
-      <div class="kpi-value">{fmt_x(ratio_med)}</div>
-      <div class="kpi-sub">ratio médio filtrado</div>
-    </div>""", unsafe_allow_html=True)
-with c2:
-    st.markdown(f"""<div class="kpi {kpi_cls(occ_med, hi=0.70, lo=0.50)}">
-      <div class="kpi-label">Ocupação média</div>
-      <div class="kpi-value">{fmt_pct(occ_med)}</div>
-      <div class="kpi-sub">pax / capacidade</div>
-    </div>""", unsafe_allow_html=True)
-with c3:
-    sub_p = f"{delta_p:+.1%} vs CC" if delta_p is not None else "sem dados CC"
-    cls_p = "up" if delta_p and delta_p > 0 else ("down" if delta_p and delta_p < -0.05 else "warn")
-    st.markdown(f"""<div class="kpi {cls_p}">
-      <div class="kpi-label">Preço praticado</div>
-      <div class="kpi-value">{fmt_brl(preco_med)}</div>
-      <div class="kpi-sub">{sub_p}</div>
-    </div>""", unsafe_allow_html=True)
-with c4:
-    st.markdown(f"""<div class="kpi neu">
-      <div class="kpi-label">Rotas ativas</div>
-      <div class="kpi-value">{n_rotas}</div>
-      <div class="kpi-sub">{len(df):,} registros</div>
-    </div>""", unsafe_allow_html=True)
+<div class="tabs">
+  <button class="tab active" onclick="showTab('lf',this)">LF Atual vs Projetado</button>
+  <button class="tab" onclick="showTab('curva',this)">Curva por Antecedência</button>
+  <button class="tab" onclick="showTab('preco',this)">Preço vs Base</button>
+  <button class="tab" onclick="showTab('occ',this)">Ocupação</button>
+  <button class="tab" onclick="showTab('tabela',this)">Tabela completa</button>
+</div>
 
+<!-- LF por eixo -->
+<div id="panel-lf" class="panel active">
+  <div class="card">
+    <div class="card-title">lf atual vs lf projetado — por eixo</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#0055e0"></span>LF Projetado 2026</span>
+      <span class="leg"><span class="leg-sq" style="background:#00c896"></span>LF Atual</span>
+    </div>
+    <div class="chart-box" id="box-lf"><canvas id="chart-lf"></canvas></div>
+  </div>
+</div>
 
-# ── TABS ──────────────────────────────────────────────────────────────────────────
-tab_lf, tab_preco, tab_rotas, tab_tabela = st.tabs([
-    "  Load Factor  ",
-    "  Preço  ",
-    "  Rotas  ",
-    "  Tabela  ",
-])
+<!-- Curva por antecedência -->
+<div id="panel-curva" class="panel">
+  <div class="card">
+    <div class="card-title">curva de antecedência — lf atual vs projetado (média dos eixos filtrados)</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#0055e0;opacity:.6"></span>LF Projetado</span>
+      <span class="leg"><span class="leg-sq" style="background:#00c896"></span>LF Atual</span>
+    </div>
+    <div class="chart-box" style="height:340px"><canvas id="chart-curva"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">curva de antecedência — preço praticado vs base (média dos eixos filtrados)</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#3a5070;border:1px dashed #3a5070"></span>Preço Base</span>
+      <span class="leg"><span class="leg-sq" style="background:#0055e0"></span>Preço Praticado</span>
+    </div>
+    <div class="chart-box" style="height:340px"><canvas id="chart-curva-preco"></canvas></div>
+  </div>
+</div>
 
+<!-- Preço -->
+<div id="panel-preco" class="panel">
+  <div class="card">
+    <div class="card-title">preço praticado vs preço base — por eixo</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#1e3a5f"></span>Preço Base</span>
+      <span class="leg"><span class="leg-sq" style="background:#0055e0"></span>Praticado</span>
+      <span class="leg"><span class="leg-sq" style="background:#e05050;border:1px dashed #e05050"></span>Concorrência</span>
+    </div>
+    <div class="chart-box" id="box-preco"><canvas id="chart-preco"></canvas></div>
+  </div>
+</div>
 
-# ══ TAB 1 · LOAD FACTOR ══════════════════════════════════════════════════════════
-with tab_lf:
-    if "antecedencia" not in df.columns:
-        st.info("Coluna antecedencia não encontrada.")
-    else:
-        grp = (
-            df.groupby("antecedencia", as_index=False)
-            .agg(
-                lf_atual      = ("lf_atual",      "mean"),
-                lf_proj_2026  = ("lf_proj_2026",  "mean"),
-                ratio_vs_proj = ("ratio_vs_proj", "mean"),
-            )
-            .sort_values("antecedencia", ascending=False)
-        )
+<!-- Ocupação -->
+<div id="panel-occ" class="panel">
+  <div class="card">
+    <div class="card-title">ocupação atual % — por eixo</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#e05050"></span>&lt; 12%</span>
+      <span class="leg"><span class="leg-sq" style="background:#d4860a"></span>12 – 20%</span>
+      <span class="leg"><span class="leg-sq" style="background:#00c896"></span>&gt; 20%</span>
+    </div>
+    <div class="chart-box" id="box-occ"><canvas id="chart-occ"></canvas></div>
+  </div>
+</div>
 
-        st.markdown('<div class="section-label">LF Atual × Projetado por antecedência</div>', unsafe_allow_html=True)
+<!-- Tabela -->
+<div id="panel-tabela" class="panel">
+  <div class="card">
+    <div class="card-title">tabela completa</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>Rota</th><th>Sentido</th><th>Turno</th><th>Data</th><th>Ant.</th>
+          <th>LF Proj</th><th>LF Atual</th><th>Ratio</th>
+          <th>PAX</th><th>Cap.</th><th>Occ%</th>
+          <th>Preço Base</th><th>Praticado</th><th>Mult.</th><th>CC</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-        fig = go.Figure()
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const ALL = {data_json};
 
-        # Área de gap
-        if {"lf_proj_2026","lf_atual"}.issubset(grp.columns):
-            fig.add_trace(go.Scatter(
-                x=pd.concat([grp["antecedencia"], grp["antecedencia"][::-1]]),
-                y=pd.concat([
-                    grp[["lf_atual","lf_proj_2026"]].max(axis=1),
-                    grp[["lf_atual","lf_proj_2026"]].min(axis=1)[::-1],
-                ]),
-                fill="toself", fillcolor="rgba(0,217,163,0.06)",
-                line=dict(color="rgba(0,0,0,0)"),
-                showlegend=False, hoverinfo="skip",
-            ))
+// ── Defaults globais do Chart.js ─────────────────────────────
+Chart.defaults.color          = '#2a3d5c';
+Chart.defaults.borderColor    = '#131d2e';
+Chart.defaults.font.family    = 'DM Mono, monospace';
+Chart.defaults.font.size      = 11;
 
-        # LF projetado
-        if "lf_proj_2026" in grp.columns:
-            fig.add_trace(go.Scatter(
-                x=grp["antecedencia"], y=grp["lf_proj_2026"],
-                name="LF Projetado",
-                mode="lines",
-                line=dict(color=GRAY, width=1.5, dash="dash"),
-                hovertemplate="Proj: %{y:.1%}<extra></extra>",
-            ))
+// ── Helpers ──────────────────────────────────────────────────
+const avg  = arr => arr.filter(v=>v!=null&&!isNaN(v)).length
+                    ? arr.filter(v=>v!=null&&!isNaN(v)).reduce((a,b)=>a+b,0) / arr.filter(v=>v!=null&&!isNaN(v)).length
+                    : null;
 
-        # LF atual — pontos coloridos por status
-        if "lf_atual" in grp.columns:
-            ref = grp["lf_proj_2026"] if "lf_proj_2026" in grp.columns else grp["lf_atual"]
-            pt_colors = [TEAL if (pd.notna(a) and pd.notna(p) and a >= p) else RED
-                         for a, p in zip(grp["lf_atual"], ref)]
-            fig.add_trace(go.Scatter(
-                x=grp["antecedencia"], y=grp["lf_atual"],
-                name="LF Atual",
-                mode="lines+markers",
-                line=dict(color=TEAL, width=2.5),
-                marker=dict(size=7, color=pt_colors, line=dict(width=0)),
-                hovertemplate="Atual: %{y:.1%}<extra></extra>",
-            ))
+function classifica(ratio) {{
+  if (ratio == null) return 'gray';
+  if (ratio < 0.30)  return 'crit';
+  if (ratio < 0.60)  return 'warn';
+  return 'ok';
+}}
 
-        l = base_fig(420)
-        l["xaxis"].update(title="dias de antecedência", autorange="reversed")
-        l["yaxis"].update(title="Load Factor", tickformat=".0%")
-        l["title"] = dict(text="LF Atual  ×  Projetado", font=dict(family=MONO, size=13, color="#6b8cae"), x=0)
-        fig.update_layout(**l)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+function ratioColor(r) {{
+  if (r == null) return '#1e3a5f';
+  if (r < 0.30)  return '#e05050';
+  if (r < 0.60)  return '#d4860a';
+  return '#00c896';
+}}
 
-        # Barras de desvio
-        if "ratio_vs_proj" in grp.columns:
-            st.markdown('<div class="section-label">Desvio ratio (atual ÷ projetado − 1)</div>', unsafe_allow_html=True)
-            delta_vals = grp["ratio_vs_proj"] - 1
-            bar_colors = [TEAL if v >= 0.05 else RED if v < -0.05 else AMBER for v in delta_vals]
+function badge(cls) {{
+  const lbl = {{crit:'Crítico',warn:'Atenção',ok:'Saudável',gray:'Sem proj.'}};
+  return `<span class="badge ${{cls}}">${{lbl[cls]||''}}</span>`;
+}}
 
-            fig2 = go.Figure(go.Bar(
-                x=grp["antecedencia"], y=delta_vals,
-                marker=dict(color=bar_colors, opacity=0.85),
-                hovertemplate="d=%{x}  Δ=%{y:+.1%}<extra></extra>",
-            ))
-            fig2.add_hline(y=0, line_color=GRAY, line_width=1)
-            fig2.add_hrect(y0=-0.05, y1=0.05, fillcolor="rgba(255,255,255,0.015)", line_width=0)
-            l2 = base_fig(230)
-            l2["xaxis"].update(autorange="reversed")
-            l2["yaxis"].update(tickformat="+.0%", title="")
-            l2["showlegend"] = False
-            l2["bargap"] = 0.25
-            fig2.update_layout(**l2)
-            st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-            st.plotly_chart(fig2, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+// ── Popula selects ───────────────────────────────────────────
+const sel = id => document.getElementById(id);
 
+[...new Set(ALL.map(d=>d.data))].sort().forEach(v=>{{
+  const o=document.createElement('option'); o.value=v; o.textContent=v.slice(5); sel('f-data').appendChild(o);
+}});
+[...new Set(ALL.map(d=>d.rota_principal))].sort().forEach(v=>{{
+  const o=document.createElement('option'); o.value=v; o.textContent=v; sel('f-rota').appendChild(o);
+}});
+[...new Set(ALL.map(d=>d.antecedencia).filter(v=>v!=null))].sort((a,b)=>a-b).forEach(v=>{{
+  const o=document.createElement('option'); o.value=v; o.textContent='d='+v; sel('f-ant').appendChild(o);
+}});
 
-# ══ TAB 2 · PREÇO ════════════════════════════════════════════════════════════════
-with tab_preco:
-    has_prat = "preco_praticado" in df.columns
-    has_base = "preco_base"      in df.columns
-    has_cc   = "price_cc"        in df.columns
+// ── Filtro ───────────────────────────────────────────────────
+function filtered() {{
+  const fD=sel('f-data').value, fR=sel('f-rota').value,
+        fT=sel('f-turno').value, fS=sel('f-status').value,
+        fA=sel('f-ant').value;
+  return ALL.filter(d=>{{
+    if(fD && d.data!==fD) return false;
+    if(fR && d.rota_principal!==fR) return false;
+    if(fT && d.turno!==fT) return false;
+    if(fA && String(d.antecedencia)!==fA) return false;
+    if(fS){{
+      const r = d.lf_proj_2026>0 ? d.lf_atual/d.lf_proj_2026 : null;
+      if(classifica(r)!==fS) return false;
+    }}
+    return true;
+  }});
+}}
 
-    if not has_prat:
-        st.info("Coluna preco_praticado não encontrada.")
-    else:
-        agg_dict = {k: (k, "mean") for k in ["preco_praticado","preco_base","price_cc"] if k in df.columns}
-        grp_p = (
-            df.groupby("antecedencia", as_index=False)
-            .agg(**agg_dict)
-            .sort_values("antecedencia", ascending=False)
-        )
+// ── Agrupa por eixo ──────────────────────────────────────────
+function byEixo(data) {{
+  const m={{}};
+  data.forEach(d=>{{
+    const k=d.sentido||d.rota_principal;
+    if(!m[k]) m[k]={{lp:[],la:[],pax:0,cap:0,base:[],prat:[],cc:[],mult:[]}};
+    m[k].lp.push(d.lf_proj_2026); m[k].la.push(d.lf_atual);
+    m[k].pax+=(d.pax||0); m[k].cap+=(d.capacidade_atual||0);
+    if(d.preco_base!=null)      m[k].base.push(+d.preco_base);
+    if(d.preco_praticado!=null) m[k].prat.push(+d.preco_praticado);
+    if(d.price_cc!=null)        m[k].cc.push(+d.price_cc);
+    if(d.mult_final!=null)      m[k].mult.push(d.mult_final);
+  }});
+  return Object.entries(m).map(([eixo,v])=>{{
+    const lp=avg(v.lp), la=avg(v.la);
+    const ratio=lp&&lp>0 ? la/lp : null;
+    return {{
+      eixo, lp, la, ratio,
+      pax:v.pax, cap:v.cap,
+      occ:v.cap?v.pax/v.cap:0,
+      base:avg(v.base), prat:avg(v.prat), cc:avg(v.cc), mult:avg(v.mult),
+    }};
+  }}).sort((a,b)=>(a.ratio??0)-(b.ratio??0));
+}}
 
-        st.markdown('<div class="section-label">Preço Praticado × Base × Concorrência</div>', unsafe_allow_html=True)
+// ── Agrupa por antecedência ──────────────────────────────────
+function byAnt(data) {{
+  const m={{}};
+  data.forEach(d=>{{
+    const k=d.antecedencia;
+    if(k==null) return;
+    if(!m[k]) m[k]={{lp:[],la:[],base:[],prat:[]}};
+    m[k].lp.push(d.lf_proj_2026); m[k].la.push(d.lf_atual);
+    if(d.preco_base!=null)      m[k].base.push(+d.preco_base);
+    if(d.preco_praticado!=null) m[k].prat.push(+d.preco_praticado);
+  }});
+  return Object.entries(m)
+    .map(([ant,v])=>({{'ant':+ant, lp:avg(v.lp), la:avg(v.la), base:avg(v.base), prat:avg(v.prat)}}))
+    .sort((a,b)=>b.ant-a.ant);   // maior antecedência → esquerda
+}}
 
-        fig3 = go.Figure()
+// ── Chart registry ───────────────────────────────────────────
+const CH={{}};
+function mkChart(id, cfg){{
+  if(CH[id]) CH[id].destroy();
+  const el=document.getElementById(id);
+  if(el) CH[id]=new Chart(el, cfg);
+}}
 
-        # Área gap praticado vs CC
-        if has_cc:
-            fig3.add_trace(go.Scatter(
-                x=pd.concat([grp_p["antecedencia"], grp_p["antecedencia"][::-1]]),
-                y=pd.concat([grp_p["preco_praticado"], grp_p["price_cc"][::-1]]),
-                fill="toself", fillcolor="rgba(0,102,255,0.06)",
-                line=dict(color="rgba(0,0,0,0)"),
-                showlegend=False, hoverinfo="skip",
-            ))
-            fig3.add_trace(go.Scatter(
-                x=grp_p["antecedencia"], y=grp_p["price_cc"],
-                name="Concorrência",
-                mode="lines",
-                line=dict(color=RED, width=1.5, dash="dot"),
-                hovertemplate="CC: R$%{y:,.0f}<extra></extra>",
-            ))
+// ── Render ───────────────────────────────────────────────────
+function render() {{
+  const data=filtered();
+  const grp =byEixo(data);
+  const ants=byAnt(data);
 
-        # Preço base
-        if has_base:
-            fig3.add_trace(go.Scatter(
-                x=grp_p["antecedencia"], y=grp_p["preco_base"],
-                name="Preço Base",
-                mode="lines",
-                line=dict(color=GRAY, width=1.5, dash="dash"),
-                hovertemplate="Base: R$%{y:,.0f}<extra></extra>",
-            ))
+  // KPIs
+  const criticos = grp.filter(r=>r.ratio!=null&&r.ratio<0.30).length;
+  const atencao  = grp.filter(r=>r.ratio!=null&&r.ratio>=0.30&&r.ratio<0.60).length;
+  const saudavel = grp.filter(r=>r.ratio!=null&&r.ratio>=0.60).length;
+  const ratioMed = avg(grp.map(r=>r.ratio).filter(v=>v!=null));
+  const kpiCls   = ratioMed==null?'neu':ratioMed>=0.60?'up':ratioMed>=0.30?'warn':'down';
 
-        # Preço praticado
-        fig3.add_trace(go.Scatter(
-            x=grp_p["antecedencia"], y=grp_p["preco_praticado"],
-            name="Praticado",
-            mode="lines+markers",
-            line=dict(color=BLUE, width=2.5),
-            marker=dict(size=7, color=BLUE, line=dict(width=0)),
-            hovertemplate="Praticado: R$%{y:,.0f}<extra></extra>",
-        ))
+  sel('kpi-row').innerHTML=`
+    <div class="kpi ${{kpiCls}}">
+      <div class="kpi-label">Ratio médio (lf_atual/proj)</div>
+      <div class="kpi-value">${{ratioMed!=null?(ratioMed*100).toFixed(0)+'%':'–'}}</div>
+      <div class="kpi-sub">${{grp.length}} eixos filtrados</div>
+    </div>
+    <div class="kpi ${{criticos>0?'down':'neu'}}">
+      <div class="kpi-label">Críticos (&lt; 30% do proj)</div>
+      <div class="kpi-value">${{criticos}}</div>
+      <div class="kpi-sub">eixos abaixo do threshold</div>
+    </div>
+    <div class="kpi ${{atencao>0?'warn':'neu'}}">
+      <div class="kpi-label">Atenção (30 – 60%)</div>
+      <div class="kpi-value">${{atencao}}</div>
+      <div class="kpi-sub">eixos em zona amarela</div>
+    </div>
+    <div class="kpi up">
+      <div class="kpi-label">Saudáveis (≥ 60%)</div>
+      <div class="kpi-value">${{saudavel}}</div>
+      <div class="kpi-sub">eixos no target</div>
+    </div>
+  `;
 
-        l3 = base_fig(420)
-        l3["xaxis"].update(title="dias de antecedência", autorange="reversed")
-        l3["yaxis"].update(title="R$", tickprefix="R$ ", tickformat=",.0f")
-        l3["title"] = dict(text="Preço Praticado  ×  Base  ×  Concorrência", font=dict(family=MONO, size=13, color="#6b8cae"), x=0)
-        fig3.update_layout(**l3)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig3, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+  // ── Tab LF por eixo ──
+  const h = Math.max(320, grp.length*32+80);
+  sel('box-lf').style.height = h+'px';
+  mkChart('chart-lf',{{
+    type:'bar',
+    data:{{
+      labels: grp.map(r=>r.eixo),
+      datasets:[
+        {{
+          label:'LF Projetado',
+          data: grp.map(r=>r.lp!=null?+(r.lp*100).toFixed(1):0),
+          backgroundColor:'rgba(0,85,224,0.55)',
+          borderRadius:3,
+        }},
+        {{
+          label:'LF Atual',
+          data: grp.map(r=>r.la!=null?+(r.la*100).toFixed(1):0),
+          backgroundColor: grp.map(r=>ratioColor(r.ratio)),
+          borderRadius:3,
+        }},
+      ]
+    }},
+    options:{{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{callbacks:{{label:c=>c.dataset.label+': '+c.parsed.x.toFixed(1)+'%'}}}}
+      }},
+      scales:{{
+        x:{{ticks:{{callback:v=>v+'%'}}, grid:{{color:'#131d2e'}}}},
+        y:{{ticks:{{font:{{size:11}}}}, grid:{{display:false}}}}
+      }}
+    }}
+  }});
 
-        # Gap % praticado vs CC
-        if has_cc:
-            st.markdown('<div class="section-label">Gap praticado vs concorrência (%)</div>', unsafe_allow_html=True)
-            grp_p["gap_cc"] = grp_p["preco_praticado"] / grp_p["price_cc"] - 1
-            gap_colors = [BLUE if v >= 0 else AMBER for v in grp_p["gap_cc"].fillna(0)]
+  // ── Tab Curva LF por antecedência ──
+  mkChart('chart-curva',{{
+    type:'line',
+    data:{{
+      labels: ants.map(a=>a.ant),
+      datasets:[
+        {{
+          label:'LF Projetado',
+          data: ants.map(a=>a.lp!=null?+(a.lp*100).toFixed(2):null),
+          borderColor:'rgba(0,85,224,0.5)',
+          backgroundColor:'rgba(0,85,224,0.06)',
+          borderWidth:1.5,
+          borderDash:[5,4],
+          pointRadius:0,
+          fill:false,
+          tension:0.3,
+        }},
+        {{
+          label:'LF Atual',
+          data: ants.map(a=>a.la!=null?+(a.la*100).toFixed(2):null),
+          borderColor:'#00c896',
+          backgroundColor:'rgba(0,200,150,0.07)',
+          borderWidth:2.5,
+          pointRadius:4,
+          pointBackgroundColor: ants.map(a=>{{
+            if(a.la==null||a.lp==null) return '#1e3a5f';
+            return a.la>=a.lp ? '#00c896' : '#e05050';
+          }}),
+          pointBorderWidth:0,
+          fill:false,
+          tension:0.3,
+        }},
+      ]
+    }},
+    options:{{
+      responsive:true, maintainAspectRatio:false,
+      spanGaps:true,
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{callbacks:{{label:c=>c.dataset.label+': '+c.parsed.y?.toFixed(1)+'%'}}}}
+      }},
+      scales:{{
+        x:{{
+          reverse:false,
+          title:{{display:true,text:'dias de antecedência (maior → menor)',color:'#1e3a5f',font:{{size:10}}}},
+          ticks:{{maxTicksLimit:20}},
+          grid:{{color:'#131d2e'}}
+        }},
+        y:{{
+          title:{{display:true,text:'Load Factor',color:'#1e3a5f',font:{{size:10}}}},
+          ticks:{{callback:v=>v+'%'}},
+          grid:{{color:'#131d2e'}}
+        }}
+      }}
+    }}
+  }});
 
-            fig4 = go.Figure(go.Bar(
-                x=grp_p["antecedencia"], y=grp_p["gap_cc"],
-                marker=dict(color=gap_colors, opacity=0.80),
-                hovertemplate="d=%{x}  gap=%{y:+.1%}<extra></extra>",
-            ))
-            fig4.add_hline(y=0, line_color=GRAY, line_width=1)
-            l4 = base_fig(230)
-            l4["xaxis"].update(autorange="reversed")
-            l4["yaxis"].update(tickformat="+.0%", title="")
-            l4["showlegend"] = False
-            l4["bargap"] = 0.25
-            fig4.update_layout(**l4)
-            st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-            st.plotly_chart(fig4, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+  // ── Tab Curva Preço por antecedência ──
+  mkChart('chart-curva-preco',{{
+    type:'line',
+    data:{{
+      labels: ants.map(a=>a.ant),
+      datasets:[
+        {{
+          label:'Preço Base',
+          data: ants.map(a=>a.base!=null?+a.base.toFixed(0):null),
+          borderColor:'rgba(58,80,112,0.8)',
+          borderWidth:1.5,
+          borderDash:[5,4],
+          pointRadius:0,
+          fill:false,
+          tension:0.3,
+        }},
+        {{
+          label:'Preço Praticado',
+          data: ants.map(a=>a.prat!=null?+a.prat.toFixed(0):null),
+          borderColor:'#0055e0',
+          backgroundColor:'rgba(0,85,224,0.05)',
+          borderWidth:2.5,
+          pointRadius:4,
+          pointBackgroundColor:'#0055e0',
+          pointBorderWidth:0,
+          fill:false,
+          tension:0.3,
+        }},
+      ]
+    }},
+    options:{{
+      responsive:true, maintainAspectRatio:false,
+      spanGaps:true,
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{callbacks:{{label:c=>c.dataset.label+': R$ '+c.parsed.y?.toFixed(0)}}}}
+      }},
+      scales:{{
+        x:{{
+          title:{{display:true,text:'dias de antecedência',color:'#1e3a5f',font:{{size:10}}}},
+          ticks:{{maxTicksLimit:20}},
+          grid:{{color:'#131d2e'}}
+        }},
+        y:{{
+          title:{{display:true,text:'R$',color:'#1e3a5f',font:{{size:10}}}},
+          ticks:{{callback:v=>'R$'+v}},
+          grid:{{color:'#131d2e'}}
+        }}
+      }}
+    }}
+  }});
 
+  // ── Tab Preço por eixo ──
+  const grpP=[...grp].sort((a,b)=>(b.prat||0)-(a.prat||0));
+  const hp=Math.max(320,grpP.length*32+80);
+  sel('box-preco').style.height=hp+'px';
+  mkChart('chart-preco',{{
+    type:'bar',
+    data:{{
+      labels:grpP.map(r=>r.eixo),
+      datasets:[
+        {{
+          label:'Preço Base',
+          data:grpP.map(r=>r.base!=null?+r.base.toFixed(0):0),
+          backgroundColor:'rgba(30,58,95,0.7)',
+          borderRadius:3,
+        }},
+        {{
+          label:'Praticado',
+          data:grpP.map(r=>r.prat!=null?+r.prat.toFixed(0):0),
+          backgroundColor:'rgba(0,85,224,0.75)',
+          borderRadius:3,
+        }},
+        {{
+          label:'CC',
+          data:grpP.map(r=>r.cc!=null?+r.cc.toFixed(0):0),
+          backgroundColor:'rgba(224,80,80,0.55)',
+          borderRadius:3,
+        }},
+      ]
+    }},
+    options:{{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{callbacks:{{label:c=>c.dataset.label+': R$ '+c.parsed.x.toFixed(0)}}}}
+      }},
+      scales:{{
+        x:{{ticks:{{callback:v=>'R$'+v}}, grid:{{color:'#131d2e'}}}},
+        y:{{ticks:{{font:{{size:11}}}}, grid:{{display:false}}}}
+      }}
+    }}
+  }});
 
-# ══ TAB 3 · ROTAS ════════════════════════════════════════════════════════════════
-with tab_rotas:
-    if "rota_principal" not in df.columns:
-        st.info("Coluna rota_principal não encontrada.")
-    else:
-        ants_disp = sorted(df["antecedencia"].dropna().unique().astype(int))
-        col_ref   = st.select_slider("Antecedência de referência", options=ants_disp, value=ants_disp[0])
-        df_ref    = df[df["antecedencia"] == col_ref]
-        nome_col  = "sentido" if "sentido" in df_ref.columns else "rota_principal"
+  // ── Tab Ocupação ──
+  const grpO=[...grp].sort((a,b)=>b.occ-a.occ);
+  const ho=Math.max(320,grpO.length*32+80);
+  sel('box-occ').style.height=ho+'px';
+  mkChart('chart-occ',{{
+    type:'bar',
+    data:{{
+      labels:grpO.map(r=>r.eixo),
+      datasets:[{{
+        label:'Occ %',
+        data:grpO.map(r=>+(r.occ*100).toFixed(1)),
+        backgroundColor:grpO.map(r=>r.occ<0.12?'#e05050':r.occ<0.20?'#d4860a':'#00c896'),
+        borderRadius:3,
+      }}]
+    }},
+    options:{{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{{
+        legend:{{display:false}},
+        tooltip:{{callbacks:{{label:c=>c.parsed.x.toFixed(1)+'%'}}}}
+      }},
+      scales:{{
+        x:{{max:100, ticks:{{callback:v=>v+'%'}}, grid:{{color:'#131d2e'}}}},
+        y:{{ticks:{{font:{{size:11}}}}, grid:{{display:false}}}}
+      }}
+    }}
+  }});
 
-        grp_r = (
-            df_ref.groupby(nome_col, as_index=False)
-            .agg(
-                ratio_vs_proj   = ("ratio_vs_proj",   "mean"),
-                lf_atual        = ("lf_atual",         "mean"),
-                lf_proj_2026    = ("lf_proj_2026",     "mean"),
-                occ_atual       = ("occ_atual",         "mean"),
-                preco_praticado = ("preco_praticado",  "mean"),
-            )
-            .sort_values("ratio_vs_proj", ascending=True)
-        )
+  // ── Tabela ──
+  sel('tbody').innerHTML = data.map(d=>{{
+    const ratio=d.lf_proj_2026>0 ? d.lf_atual/d.lf_proj_2026 : null;
+    const cls  =classifica(ratio);
+    const pct  =v=>v!=null?(v*100).toFixed(1)+'%':'–';
+    const brl  =v=>v!=null?'R$ '+(+v).toFixed(0):'–';
+    const num  =v=>v!=null?v:'–';
+    const ratioStyle=`color:${{ratioColor(ratio)}};font-weight:600;font-family:'DM Mono',monospace`;
+    return `<tr>
+      <td>${{badge(cls)}}</td>
+      <td style="color:#c8d8f0;font-weight:500">${{d.rota_principal}}</td>
+      <td>${{d.sentido||'–'}}</td>
+      <td>${{d.turno||'–'}}</td>
+      <td style="font-family:'DM Mono',monospace">${{d.data||'–'}}</td>
+      <td style="font-family:'DM Mono',monospace">${{d.antecedencia??'–'}}</td>
+      <td style="font-family:'DM Mono',monospace">${{pct(d.lf_proj_2026)}}</td>
+      <td style="font-family:'DM Mono',monospace">${{pct(d.lf_atual)}}</td>
+      <td style="${{ratioStyle}}">${{ratio!=null?(ratio*100).toFixed(1)+'%':'–'}}</td>
+      <td>${{num(d.pax)}}</td>
+      <td>${{num(d.capacidade_atual)}}</td>
+      <td style="font-family:'DM Mono',monospace">${{pct(d.occ_atual)}}</td>
+      <td style="font-family:'DM Mono',monospace">${{brl(d.preco_base)}}</td>
+      <td style="font-family:'DM Mono',monospace">${{brl(d.preco_praticado)}}</td>
+      <td style="font-family:'DM Mono',monospace">${{d.mult_final!=null?d.mult_final.toFixed(2)+'×':'–'}}</td>
+      <td style="font-family:'DM Mono',monospace">${{brl(d.price_cc)}}</td>
+    </tr>`;
+  }}).join('');
+}}
 
-        r_colors = [TEAL if v >= 1.05 else RED if v < 0.95 else AMBER for v in grp_r["ratio_vs_proj"]]
+function showTab(name, el) {{
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  el.classList.add('active');
+  setTimeout(render,30);
+}}
 
-        st.markdown(f'<div class="section-label">Ratio LF por sentido — d = {col_ref}</div>', unsafe_allow_html=True)
+render();
+</script>
+</body>
+</html>
+"""
 
-        fig5 = go.Figure(go.Bar(
-            x=grp_r["ratio_vs_proj"],
-            y=grp_r[nome_col],
-            orientation="h",
-            marker=dict(color=r_colors, opacity=0.85),
-            text=[f"{v:.2f}×" for v in grp_r["ratio_vs_proj"]],
-            textfont=dict(family=MONO, size=11),
-            textposition="outside",
-            hovertemplate="%{y}  %{x:.3f}×<extra></extra>",
-        ))
-        fig5.add_vline(x=1, line_color=GRAY, line_width=1.5, line_dash="dot")
-        l5 = base_fig(max(420, len(grp_r) * 22))
-        l5["xaxis"].update(title="ratio (1.0 = no target)", tickformat=".2f")
-        l5["yaxis"].update(title="", tickfont=dict(family=MONO, size=11))
-        l5["showlegend"] = False
-        l5["bargap"] = 0.30
-        fig5.update_layout(**l5)
-        st.markdown('<div class="chart-wrap">', unsafe_allow_html=True)
-        st.plotly_chart(fig5, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="section-label">Detalhe por sentido</div>', unsafe_allow_html=True)
-        tbl = grp_r.copy()
-        for c, fn in [("ratio_vs_proj",fmt_x),("lf_atual",fmt_pct),("lf_proj_2026",fmt_pct),
-                      ("occ_atual",fmt_pct),("preco_praticado",fmt_brl)]:
-            if c in tbl.columns: tbl[c] = tbl[c].map(fn)
-        st.dataframe(tbl.sort_values(nome_col), use_container_width=True, hide_index=True)
-
-
-# ══ TAB 4 · TABELA ═══════════════════════════════════════════════════════════════
-with tab_tabela:
-    COLS = [c for c in [
-        "data","rota_principal","sentido","turno","antecedencia","dia_da_semana",
-        "occ_atual","lf_atual","lf_proj_2026","ratio_vs_proj",
-        "preco_base","preco_praticado","price_cc",
-        "mult_final","mult_flutuacao",
-        "pax","vagas_restantes","capacidade_atual",
-    ] if c in df.columns]
-
-    df_show = df[COLS].copy()
-    if "data" in df_show.columns:
-        df_show["data"] = df_show["data"].dt.strftime("%d/%m")
-    for c in ["occ_atual","lf_atual","lf_proj_2026","ratio_vs_proj"]:
-        if c in df_show.columns:
-            df_show[c] = df_show[c].map(lambda v: f"{v:.3f}" if pd.notna(v) else "–")
-    for c in ["preco_base","preco_praticado","price_cc"]:
-        if c in df_show.columns:
-            df_show[c] = df_show[c].map(lambda v: f"R${v:,.0f}" if pd.notna(v) else "–")
-
-    busca = st.text_input("🔎 Buscar rota / sentido", "")
-    if busca:
-        mask = df_show.astype(str).apply(lambda r: r.str.contains(busca, case=False)).any(axis=1)
-        df_show = df_show[mask]
-
-    st.dataframe(df_show, use_container_width=True, height=520, hide_index=True)
-    st.download_button(
-        "⬇  Exportar CSV filtrado",
-        df[COLS].to_csv(index=False).encode("utf-8"),
-        file_name=f"farol_{feriado_cfg.get('key','feriado')}.csv",
-        mime="text/csv",
-    )
+st.components.v1.html(html, height=1200, scrolling=True)
